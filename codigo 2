@@ -1,0 +1,108 @@
+#include <SD.h> 
+#include <SPI.h>
+// Definiciones de pines
+#define STEP_PIN_1 18    // Pin STEP para el primer motor 
+#define DIR_PIN_1 19     // Pin DIR para el primer motor
+#define ENABLE_PIN_1 21  // Pin ENABLE para el primer motor
+#define STEP_PIN_2 22    // Pin STEP para el segundo motor
+#define DIR_PIN_2 23     // Pin DIR para el segundo motor
+#define ENABLE_PIN_2 5   // Pin ENABLE para el segundo motor
+// Estructura para almacenar los pulsos
+struct Pulso {
+  unsigned long inicio_s;  // Tiempo de inicio en segundos
+  unsigned long duracion_s; // Duración del pulso en segundos
+};
+// Ejemplo de pulsos para ambos motores
+Pulso pulsos[] = {
+  {0, 5},    // Activación del motor 1 a 0s durante 5 segundos
+  {0, 5},    // Activación del motor 2 a 25s durante 5 segundos
+  {5, 5},    // Activación del motor 1 a 50s durante 5 segundos
+  {5, 5},    // Activación del motor 2 a 75s durante 5 segundos
+  {10, 5},   // Activación del motor 1 a 100s durante 5 segundos
+  // Añadir más pulsos si es necesario
+};
+const int totalPulsos = sizeof(pulsos) / sizeof(pulsos[0]);
+const int step_delay = 1000;  // microsegundos entre cada paso (para velocidad constante)
+int pulso_actual = 0;
+unsigned long tiempo_inicio_pulso = 0;
+void setup() {
+  // Configuración de pines para el primer motor
+  pinMode(STEP_PIN_1, OUTPUT);
+  pinMode(DIR_PIN_1, OUTPUT);
+  pinMode(ENABLE_PIN_1, OUTPUT);
+  // Configuración de pines para el segundo motor
+  pinMode(STEP_PIN_2, OUTPUT);
+  pinMode(DIR_PIN_2, OUTPUT);
+  pinMode(ENABLE_PIN_2, OUTPUT);
+  // Habilitar ambos motores
+  digitalWrite(ENABLE_PIN_1, LOW);  // Habilitar el motor 1
+  digitalWrite(ENABLE_PIN_2, LOW);  // Habilitar el motor 2
+  // Establecer la dirección de ambos motores
+  digitalWrite(DIR_PIN_1, HIGH);  // Dirección del motor 1
+  digitalWrite(DIR_PIN_2, LOW);   // Dirección del motor 2
+  Serial.begin(115200);
+  Serial.println("Comienza la simulación de los motores");
+}
+void loop() {
+  unsigned long tiempo_actual_s = millis() / 1000;  // Obtener el tiempo en segundos
+  // Si el tiempo actual es mayor o igual al tiempo de inicio del pulso
+  if (pulso_actual < totalPulsos && tiempo_actual_s >= pulsos[pulso_actual].inicio_s) {
+    Serial.print("Activando motor ");
+    if (pulso_actual % 2 == 0) {
+      Serial.print("1");
+      Serial.print(" por ");
+      Serial.print(pulsos[pulso_actual].duracion_s);
+      Serial.println(" segundos");
+      tiempo_inicio_pulso = tiempo_actual_s;  // Establecer el tiempo de inicio del pulso
+      // Hacer girar el motor 1 por la duración del pulso
+      while (tiempo_actual_s - tiempo_inicio_pulso < pulsos[pulso_actual].duracion_s) {
+        digitalWrite(STEP_PIN_1, HIGH);
+        delayMicroseconds(step_delay);
+        digitalWrite(STEP_PIN_1, LOW);
+        delayMicroseconds(step_delay);
+        tiempo_actual_s = millis() / 1000;  // Actualizar el tiempo actual
+      }
+    } else {
+      Serial.print("2");
+      Serial.print(" por ");
+      Serial.print(pulsos[pulso_actual].duracion_s);
+      Serial.println(" segundos");
+      tiempo_inicio_pulso = tiempo_actual_s;  // Establecer el tiempo de inicio del pulso
+      // Hacer girar el motor 2 por la duración del pulso
+      while (tiempo_actual_s - tiempo_inicio_pulso < pulsos[pulso_actual].duracion_s) {
+        digitalWrite(STEP_PIN_2, HIGH);
+        delayMicroseconds(step_delay);
+        digitalWrite(STEP_PIN_2, LOW);
+        delayMicroseconds(step_delay);
+        tiempo_actual_s = millis() / 1000;  // Actualizar el tiempo actual
+      }
+    }
+    // Detener el motor después de que el tiempo de activación haya pasado
+    Serial.println("Deteniendo motor");
+    pulso_actual++;  // Avanzar al siguiente evento
+  }
+  // Si se acabaron los pulsos o se encuentra un valor negativo, retroceder los motores
+  if (pulso_actual >= totalPulsos || pulsos[pulso_actual].inicio_s < 0) {
+    Serial.println("Retrocediendo los motores a su posición inicial.");
+    // Retroceder motor 1 primero
+    digitalWrite(DIR_PIN_1, LOW);  // Cambiar la dirección para el retroceso
+    for (int i = 0; i < pulsos[pulso_actual - 1].duracion_s * 1000 / step_delay; i++) {
+      digitalWrite(STEP_PIN_1, HIGH);
+      delayMicroseconds(step_delay);
+      digitalWrite(STEP_PIN_1, LOW);
+      delayMicroseconds(step_delay);
+    }
+    Serial.println("Motor 1 ha retrocedido");
+    // Retroceder motor 2 después de que el motor 1 haya terminado
+    digitalWrite(DIR_PIN_2, HIGH);  // Cambiar la dirección para el retroceso
+    for (int i = 0; i < pulsos[pulso_actual - 1].duracion_s * 1000 / step_delay; i++) {
+      digitalWrite(STEP_PIN_2, HIGH);
+      delayMicroseconds(step_delay);
+      digitalWrite(STEP_PIN_2, LOW);
+      delayMicroseconds(step_delay);
+    }
+    Serial.println("Motor 2 ha retrocedido");
+    // Reseteamos el índice de pulsos para cargar el siguiente archivo CSV
+    pulso_actual = 0;  // O restablecer a lo que desees según la lógica del programa
+  }
+}
