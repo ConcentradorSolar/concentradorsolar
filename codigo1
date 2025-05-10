@@ -1,0 +1,104 @@
+% Motor 1 - Recorrido Solar Corregido (Azimuth)
+T1 = readtable("C:\9 SEMESTRE\recorrido_solar_corregido.xlsx", 'VariableNamingRule', 'preserve');
+tiempo_datetime1 = datetime(T1.("Hora(h)"), 'InputFormat', 'HH:mm');
+tiempo_segundos1 = seconds(tiempo_datetime1 - tiempo_datetime1(1));
+angulo_original1 = T1.("Angulo(°)");
+valido1 = isfinite(tiempo_segundos1) & isfinite(angulo_original1);
+tiempo_mod1 = tiempo_segundos1(valido1);
+angulo_mod1 = angulo_original1(valido1);
+angulo_procesado1 = zeros(size(angulo_mod1));
+angulo_procesado1(1) = angulo_mod1(1) - 90;
+angulo_procesado1(end) = -90;
+deltas1 = diff(angulo_mod1);
+angulo_procesado1(2:end-1) = deltas1(1:end-1);
+angulo_normalizado1 = angulo_procesado1 / 0.2;
+
+velocidad = 5 * pi;
+tiempo_senal1 = [];
+senal1 = [];
+for i = 1:length(tiempo_mod1)
+    t_ini = tiempo_mod1(i);
+    dur = angulo_normalizado1(i);
+    if ~isfinite(dur) || dur <= 0
+        continue;
+    end
+    t = [t_ini; t_ini + 0.01; t_ini + dur; t_ini + dur + 0.01];
+    v = [0; velocidad; velocidad; 0];
+    tiempo_senal1 = [tiempo_senal1; t];
+    senal1 = [senal1; v];
+end
+%% Motor 2 - Datos Seguidor Solar Corregido Altitud
+T2 = readtable("C:\9 SEMESTRE\datos_seguidor_solar_corregido_altitud.xlsx", 'VariableNamingRule', 'preserve');
+tiempo_minutos2 = T2.(1);
+tiempo_segundos2 = tiempo_minutos2 * 60;
+angulo_original2 = T2.(2);
+valido2 = isfinite(tiempo_segundos2) & isfinite(angulo_original2);
+tiempo_mod2 = tiempo_segundos2(valido2);
+angulo_mod2 = angulo_original2(valido2);
+if angulo_mod2(1) < 0.2
+    angulo_mod2(1) = 0.2;
+end
+angulo_procesado2 = zeros(size(angulo_mod2));
+angulo_procesado2(1) = 0.2;
+angulo_procesado2(end) = -90;
+deltas2 = diff(angulo_mod2);
+angulo_procesado2(2:end-1) = deltas2(1:end-1);
+angulo_normalizado2 = angulo_procesado2 / 0.2;
+tiempo_senal2 = [];
+senal2 = [];
+for i = 1:length(tiempo_mod2)
+    t_ini = tiempo_mod2(i);
+    dur = angulo_normalizado2(i);
+    if ~isfinite(dur) || dur <= 0
+        continue;
+    end
+    t = [t_ini; t_ini + 0.01; t_ini + dur; t_ini + dur + 0.01];
+    v = [0; velocidad; velocidad; 0];
+    tiempo_senal2 = [tiempo_senal2; t];
+    senal2 = [senal2; v];
+end
+%% Crear el Excel con duraciones reales
+duracion1 = angulo_normalizado1;
+duracion2 = angulo_normalizado2;
+n1 = length(tiempo_mod1);
+n2 = length(tiempo_mod2);
+momento = [];
+duracion = [];
+i = 1; j = 1;
+while i <= n1 || j <= n2
+    if i <= n1
+        momento = [momento; tiempo_mod1(i)];
+        duracion = [duracion; duracion1(i)];
+        i = i + 1;
+    end
+    if j <= n2
+        momento = [momento; tiempo_mod2(j)];
+        duracion = [duracion; duracion2(j)];
+        j = j + 1;
+    end
+end
+tabla_resultado = table(momento, duracion);
+tabla_resultado.Properties.VariableNames = {'Momento_segundos', 'Duracion_segundos'};
+writetable(tabla_resultado, 'resultado_intercalado.xlsx');
+%% Graficar ambos motores - Mejorado
+figure;
+subplot(2,1,1);
+plot(tiempo_senal1, senal1, 'Color', [1 0.8 0], 'LineWidth', 2.5);
+xlabel('Tiempo [s]', 'FontSize', 12);
+ylabel('Velocidad [rad/s]', 'FontSize', 12);
+title('Motor 1 - Ángulo de Azimuth', 'FontSize', 14, 'FontWeight', 'bold');
+grid on;
+ax = gca;
+ax.GridLineStyle = '--';
+legend('Motor 1', 'Location', 'northwest');
+subplot(2,1,2);
+plot(tiempo_senal2, senal2, 'Color', [1 0 0], 'LineWidth', 2.5);
+xlabel('Tiempo [s]', 'FontSize', 12);
+ylabel('Velocidad [rad/s]', 'FontSize', 12);
+title('Motor 2 - Ángulo de Altitud', 'FontSize', 14, 'FontWeight', 'bold');
+grid on;
+ax = gca;
+ax.GridLineStyle = '--';
+legend('Motor 2', 'Location', 'northwest');
+%% Abrir el Excel automáticamente
+open resultado_intercalado.xlsx
